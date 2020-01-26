@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <title>Farnamgraph</title>
+  <meta name="description" content="A graph of all Farnam Street articles and the referenced books (amazon links).">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, shrink-to-fit=no">
+
+  <script src="assets/echarts-4.5.0.js"></script>
+  <script src="assets/echarts-gl-1.1.1.js"></script>
+  <style rel="stylesheet" media="all">
+    body {
+      display: flex;
+      min-height: 100vh;
+      flex-direction: column;
+      margin: 0;
+      background: white;
+      /* Disables inertia scroll (top / bottom wiggle) on MacOS. */
+      overflow: hidden;
+    }
+
+    main {
+      width: 100vw;
+      flex: 1;
+    }
+
+    footer {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      height: 30px;
+      color: black;
+      padding: 40px 30px;
+      box-sizing: border-box;
+    }
+  </style>
+</head>
+
+<body>
+  <main id="graph">
+
+  </main>
+
+  <footer>
+    <small>
+      <span>Last updated on <time>%%LAST_UPDATED%%</time>,</span>
+      <span>showing nodes that are</span>
+      <select id="filter-type">
+        <option value="referred_by">referred by</option>
+        <option value="refer_to">referring to</option>
+      </select>
+      <span>at least</span>
+      <input id="filter-value" type="number" min="0" value="0" />
+      <span>others.</span>
+    </small>
+  </footer>
+
+  <script>
+    // @ts-check
+
+
+
+    // --- Constants.
+
+
+
+    // Farnam Street's Amazon link stuff.
+    // TODO: there was some linkId or whatever here, is that necessary?
+    const FS_AMAZON_POSTFIX = 'ref=as_li_qf_sp_asin_il_tl?ie=UTF8&camp=1789&creative=9325&creativeASIN=0345472322&linkCode=as2&tag=farnamstreet-20';
+
+    // This is where the chart will be mounted.
+    const GRAPH_ELEM = document.getElementById('graph');
+
+    // These are referred to by their id in the array, see above.
+    const CATEGORIES = [
+      { name: 'Book', itemStyle: { color: '#ff6d2b' } },
+      { name: 'Article', itemStyle: { color: '#74d1ea' } }
+    ]
+
+
+
+    // --- Annotating graph data.
+
+
+
+    // Categorizes a node based on it's label.
+    function assignCategory(node) {
+      if (node.label.includes('amazon.com')) {
+        node.category = 0;
+        return;
+      } if (node.label.includes('fs.blog')) {
+        node.category = 1;
+        return;
+      } else {
+        console.warn('Category not found for label.', node.label);
+      }
+    }
+
+    // Calculates the weight of a node based on it's refcount, naive impl.
+    function assignValue(edges) {
+      return (node) => {
+        // A value of a node is the count of nodes that refer to it.
+        node.value = edges.reduce((refs, e) => e.target === node.id ? refs + 1 : refs, 0);
+      };
+    }
+
+    // Annotates the graph with echarts-specific necessary values.
+    function preprocessGraph(nodes, edges) {
+      nodes.forEach(assignCategory);
+      nodes.forEach(assignValue(edges));
+      nodes.forEach(n => {
+        n.name = n.label;
+        n.symbolSize = n.value + 5;
+      });
+
+      return [nodes, edges];
+    }
+
+
+
+    // --- Echarts related.
+
+
+
+    // Returns an echarts specific options object that configures the graph.
+    function makeGraphOptions(nodes, edges) {
+      return {
+        // This shows the legend on top.
+        legend: [{
+          // Disables selection of different node categories.
+          selectedMode: false,
+          data: CATEGORIES.map(c => c.name)
+        }],
+
+        // This controls the little tooltip when the mouse is hovering a node.
+        tooltip: {
+          show: true,
+          // {b} is the name, {c} is the value.
+          formatter: '{b} is referenced by {c} article(s).'
+        },
+
+        // This is the data itself.
+        series: [
+          {
+            // The graph layout and display engine.
+            type: 'graphGL',
+            forceAtlas2: {
+              // TODO: check if this can be tweaked to make things nicer.
+            },
+
+            // Node and edge data.
+            nodes: nodes,
+            edges: edges,
+            categories: Object.values(CATEGORIES),
+
+            // Style of the lines (edges) between nodes.
+            lineStyle: {
+              color: '#d3d9dc'
+            },
+
+            // This controls which dataset we want, we have only one.
+            legend: {
+              show: false,
+            }
+          }
+        ]
+      }
+    }
+
+    // Makes an echart instance, it has to be updated to display data.
+    function makeGraphInstance(holder) {
+      const instance = echarts.init(holder);
+      return instance;
+    }
+
+    // Updates an echarts instance.
+    function updateGraphInstance(instance, options) {
+      instance.setOption(options);
+    }
+
+    // Event-handler for clicks that opens the link of the node in a new page.
+    function bindToChartClickEventAndOpenNodeLinkOnNewPage(instance) {
+      // Handling of clicks to nodes.
+      instance.on('click', ({ data: node }) => {
+        // The label should be the URL, with a trailing /.
+        var url = `https://${node.label}`;
+
+        // If it's a book, then add Farnam Street's Amazon referral thing.
+        if (node.category === 0) {
+          // TODO: there was some linkId or whatever here, is that necessary?
+          url += FS_AMAZON_POSTFIX;
+        }
+
+        // Then open in a new tab.
+        window.open(url, '_blank');
+      });
+    }
+
+
+
+    // --- Main.
+
+
+
+    // Shows and hides nodes according to filters, naive impl.
+    function applyFilters(nodes, edges) {
+      const type = document.getElementById('filter-type').value;
+      const value = document.getElementById('filter-value').value;
+
+      // Make all nodes and edges invisible.
+      nodes.forEach(node => (node.itemStyle = { opacity: 0 }));
+      edges.forEach(edge => (edge.lineStyle = { opacity: 0 }));
+
+      // Incoming and outgoing edges for all nodes.
+      var normalized = nodes.map(node => ({...node, edges_in: [], edges_out: []}));
+      edges.forEach(edge => {
+        normalized[edge.source].edges_out.push(edge.target);
+        normalized[edge.target].edges_in.push(edge.source);
+      });
+
+      // 'referred_by' counts the amount of incoming edges, 'refer_to'
+      // counts the amount of outgoing edges.
+      if (type === 'referred_by') {
+        // A node is retained if it's referred to at least $value times.
+        var passing = normalized.filter(node => node.edges_in.length >= value);
+        var passingIds = passing.map(node => node.id);
+
+        // A node is retained if it's the neighbor of the passing nodes, this
+        // is calculated by finding any outgoing edge that targets a passing
+        // node.
+        var supporting = normalized.filter(node => {
+          return node.edges_out.find(id => passingIds.includes(id)) !== undefined;
+        });
+
+        // The final result is the union of the nodes that are retained plus
+        // all the nodes that refer to them.
+        passing = passing.concat(supporting);
+        passingIds = passing.map(node => node.id);
+      } else if(type === 'refer_to') {
+        // A node is retained if it's referred to at least $value times.
+        var passing = normalized.filter(node => node.edges_out.length >= value);
+        var passingIds = passing.map(node => node.id);
+
+        // A node is retained if it's the neighbor of the passing nodes, this
+        // is calculated by finding any outgoing edge that targets a passing
+        // node.
+        var supporting = normalized.filter(node => {
+          return node.edges_in.find(id => passingIds.includes(id)) !== undefined;
+        });
+
+        // The final result is the union of the nodes that are retained plus
+        // all the nodes that refer to them.
+        passing = passing.concat(supporting);
+        passingIds = passing.map(node => node.id);
+      }
+
+      // Make all nodes and edges visible that are passing.
+      passingIds.forEach(i => (nodes[i].itemStyle.opacity = 1));
+      edges.forEach(edge => (edge.lineStyle.opacity = (passingIds.includes(edge.source) && passingIds.includes(edge.target)) ? 1 : 0 ));
+
+      return [nodes, edges];
+    }
+
+    // Binds everything and runs the page.
+    function runPage() {
+      fetch('assets/data/fs.json')
+        .then(res => res.json())
+        .then(({ graph }) => {
+          // Annotate the graph and make a graph instance.
+          const [nodes, edges] = preprocessGraph(graph.nodes, graph.edges);
+          const instance = makeGraphInstance(GRAPH_ELEM);
+          updateGraphInstance(instance, makeGraphOptions(nodes, edges));
+
+          // Bind the event handler for clicks on the nodes.
+          bindToChartClickEventAndOpenNodeLinkOnNewPage(instance);
+
+          ['filter-type', 'filter-value']
+            .map(id => document.getElementById(id))
+            .forEach(node => node.addEventListener('change', () => {
+              const [nextNodes, nextEdges] = applyFilters(nodes, edges);
+              updateGraphInstance(instance, makeGraphOptions(nextNodes, nextEdges));
+            }));
+        });
+    }
+
+    // Run the actual thing.
+    runPage();
+  </script>
+</body>
+
+</html>
