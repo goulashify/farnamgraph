@@ -16,3 +16,5 @@ A small set of tools that mirror the Farnam Street [blog](https://fs.blog), extr
 
 ### REQUIREMENTS
 Apart from standard POSIX tooling the scripts depend on *wget*, *jq*, and *graphviz*.
+
+**Important note**: the sources (*static/index.html*) contain tracking scripts for my own use, remove these if you're deploying to your own environment.
