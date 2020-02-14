@@ -29,9 +29,8 @@
       position: absolute;
       bottom: 0;
       left: 0;
-      height: 30px;
       color: black;
-      padding: 40px 30px;
+      padding: 2vh 5vw;
       box-sizing: border-box;
     }
   </style>
@@ -39,7 +38,11 @@
 
 <body>
   <main id="graph">
-
+    <noscript>
+      We're doing WebGL witchery to display the graph, it can't be done in the
+      browser without JavaScript, it looks like it's disabled in your browser,
+      please enable it in order to use it in this site.
+    </noscript>
   </main>
 
   <footer>
@@ -213,7 +216,7 @@
       edges.forEach(edge => (edge.lineStyle = { opacity: 0 }));
 
       // Incoming and outgoing edges for all nodes.
-      var normalized = nodes.map(node => ({...node, edges_in: [], edges_out: []}));
+      var normalized = nodes.map(node => ({ ...node, edges_in: [], edges_out: [] }));
       edges.forEach(edge => {
         normalized[edge.source].edges_out.push(edge.target);
         normalized[edge.target].edges_in.push(edge.source);
@@ -237,7 +240,7 @@
         // all the nodes that refer to them.
         passing = passing.concat(supporting);
         passingIds = passing.map(node => node.id);
-      } else if(type === 'refer_to') {
+      } else if (type === 'refer_to') {
         // A node is retained if it's referred to at least $value times.
         var passing = normalized.filter(node => node.edges_out.length >= value);
         var passingIds = passing.map(node => node.id);
@@ -257,7 +260,7 @@
 
       // Make all nodes and edges visible that are passing.
       passingIds.forEach(i => (nodes[i].itemStyle.opacity = 1));
-      edges.forEach(edge => (edge.lineStyle.opacity = (passingIds.includes(edge.source) && passingIds.includes(edge.target)) ? 1 : 0 ));
+      edges.forEach(edge => (edge.lineStyle.opacity = (passingIds.includes(edge.source) && passingIds.includes(edge.target)) ? 1 : 0));
 
       return [nodes, edges];
     }
@@ -287,18 +290,18 @@
     // Run the actual thing.
     runPage();
   </script>
-  
+
   <!-- 
   Web analytics for farnam.jazzware.io, remove this if you're deploying
   to your own environment.
   -->
   <script type="text/javascript">
     var _gauges = _gauges || [];
-    (function() {
-      var t   = document.createElement('script');
-      t.type  = 'text/javascript';
+    (function () {
+      var t = document.createElement('script');
+      t.type = 'text/javascript';
       t.async = true;
-      t.id    = 'gauges-tracker';
+      t.id = 'gauges-tracker';
       t.setAttribute('data-site-id', '5e2e09f4e820015c7a994e59');
       t.setAttribute('data-track-path', 'https://track.gaug.es/track.gif');
       t.src = 'https://d2fuc4clr7gvcn.cloudfront.net/track.js';
