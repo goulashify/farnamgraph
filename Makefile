@@ -15,7 +15,9 @@ mirror:
 		--recursive \
 		--domains "fs.blog" \
 		--accept-regex "fs.blog/20../../.*/\$$" \
-		--reject-regex "/amp/\|/smart-decisions/" \
+		--reject-regex "/amp/|/smart\-decisions/" \
+		--compression "auto" \
+		--content-on-error \
 		--directory-prefix "$(MIRROR)/" \
 		--no-verbose \
 		--timestamping \
