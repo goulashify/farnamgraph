@@ -10,7 +10,7 @@ DIST_DATA=$(DIST)/assets/data
 # Updates the mirror/ directory.
 mirror:
 	@echo "Fetching Farnam Street articles to $(MIRROR)/...";
-	@wget\
+	-@wget\
 		--mirror \
 		--recursive \
 		--domains "fs.blog" \
@@ -25,7 +25,7 @@ mirror:
 
 # Extracts all links to amazon products and fs.blog articles from the text of
 # the articles mirrored and builds a graph from it.
-$(DIST_DATA)/fs.dot: mirror
+$(DIST_DATA)/fs.dot:
 	@echo "Extracting graph from articles..."
 	@mkdir -p $(DIST_DATA)
 	@awk -f extract.awk $(MIRROR)/fs.blog/*/*/*/index.html >> $(DIST_DATA)/fs.dot
@@ -33,7 +33,7 @@ $(DIST_DATA)/fs.dot: mirror
 # Converts the graphviz-style graph to a JSONGraph, so it's usable in JS-land.
 $(DIST_DATA)/fs.json: $(DIST_DATA)/fs.dot
 	@echo "Converting Graphviz to JSONGraph..."
-	@dot -Kneato -Tjson0 -o$(DIST_DATA)/fs.dot.json $(DIST_DATA)/fs.dot 1>/dev/null
+	@dot -Ksfdp -Tjson0 $(DIST_DATA)/fs.dot > $(DIST_DATA)/fs.dot.json
 	@jq "{ \
 		graph: { nodes: [.objects[] | { id: ._gvid, label: .name }], \
 		edges: [.edges[] | { source: .tail, target: .head }] } \
